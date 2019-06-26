@@ -37,12 +37,12 @@ def temp_function():
     # print('accuracy', accuracy)
 
 
-if __name__ == '__main__':
+def batch_test():
     path = os.path.join(os.getcwd(), 'data', 'adult', 'adult_data.json')
     full_data = json.load(open(path, 'r'))
     sample = full_data[0]
     print(sample)
-    # random.shuffle(full_data)
+    random.shuffle(full_data)
     train_set = full_data[: 1000]
     test_set = full_data[-1000:]
     valid_set = full_data[300: 400]
@@ -74,4 +74,14 @@ if __name__ == '__main__':
     print('depth, ', cdt.get_depth())
     print('leaf num, ', cdt.get_leaf_num())
     print('node num, ', cdt.get_node_num())
+
+
+if __name__ == '__main__':
+    path = os.path.join(os.getcwd(), 'data', 'adult', 'adult_data.json')
+    full_data = json.load(open(path, 'r'))
+    sample = full_data[0]
+    print(sample)
+    random.shuffle(full_data)
+    print(len(full_data))
+
 

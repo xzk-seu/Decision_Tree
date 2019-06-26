@@ -1,23 +1,24 @@
 import json
 import os
-from math import log2
+from math import log2, ceil
 from copy import deepcopy
+import random
 
 
 class DecisionTree(object):
-    def __init__(self, train_set, feature_index_set, model='id3', with_post_purning=False):
+    def __init__(self, train_set, feature_index_set, model='id3', is_random_forest=False):
         """
         根据训练集构建决策树
         :param train_set:全量训练数据集
         :param feature_index_set: 所选取的特征的集合
         """
-        print('construct tree, index:')
+        # print('construct tree, index:')
         train_index_set = [x['id'] for x in train_set]
-        print('len: ', len(train_index_set))
+        # print('len: ', len(train_index_set))
+        self.is_random_forest = is_random_forest
         self.train_set = train_set
         self.feature_index_set = feature_index_set
         self.model = model
-        self.with_post_purning = with_post_purning
         self.count_class = partition_by_class(self.train_set)
         self.majority = max(self.count_class, key=lambda x: len(self.count_class[x]))
         self.is_leaf = False
@@ -29,12 +30,12 @@ class DecisionTree(object):
             # 如果不需要划分，则对该节点作为一个叶子节点处理
             self.is_leaf = True
             # print('不需要划分')
-            print('预测值为:', self.prediction)
+            # print('预测值为:', self.prediction)
             # print('===========================')
             return
 
-        self.best_feature = self.get_best_feature(self.model)
-        print('get_best_feature: ', self.best_feature)
+        self.best_feature = self.get_best_feature(model=self.model)
+        # print('get_best_feature: ', self.best_feature)
         self.count_best_feature = partition_by_feature(self.train_set, self.best_feature)
 
         if len(self.count_best_feature) == 1:
@@ -44,7 +45,7 @@ class DecisionTree(object):
             # print('按当前特征无法划分')
             # print('因为当前数据在特征[%d]下取值都为%s' % (self.best_feature, value))
             self.prediction = self.majority
-            print('预测值为:', self.prediction)
+            # print('预测值为:', self.prediction)
             # print('===================================')
             return
 
@@ -66,10 +67,14 @@ class DecisionTree(object):
 
     def get_best_feature(self, model='ID3'):
         tuple_list = list()
+        if self.is_random_forest:
+            # 随机森林，对特征进行采样
+            f_num = int(ceil(log2(len(self.feature_index_set))))
+            self.feature_index_set = random.sample(self.feature_index_set, f_num)
         for feature in self.feature_index_set:
             criteria = get_criteria(model, self.train_set, feature)
             temp_tuple = (feature, criteria)
-            print('feature: %d, criteria: %f' % (feature, criteria))
+            # print('feature: %d, criteria: %f' % (feature, criteria))
             tuple_list.append(temp_tuple)
         best_feature = max(tuple_list, key=lambda x: x[1])[0]
         max_criteria = -1
@@ -85,6 +90,9 @@ class DecisionTree(object):
         判断当前节点是否需要继续划分
         :return:
         """
+        if len(self.feature_index_set) == 0:
+            self.prediction = self.majority
+            return False
         if len(self.train_set) == 0:
             # 当前节点对应数据集为空，不需要划分
             self.prediction = None
@@ -154,22 +162,25 @@ class DecisionTree(object):
             temp_dict['sub_trees'].append(dict(value=tree['value'], tree=data))
         return temp_dict
 
-    def predict(self, data):
+    def predict(self, data, reason=False):
         """
         在当前树下预测data属于哪一类
-        :param data:
+        :param data: 待预测的数据
+        :param reason: 是否显示推理路径
         :return:
         """
         if self.is_leaf:
             # print('data[%d]的预测值为:%s' % (data['id'], self.prediction))
             return self.prediction
         else:
-            # print('此时判断特征【%d】' % self.best_feature)
             value = data['categories_feature'][self.best_feature]
-            # print('data[%d]的feature[%d]为%s' % (data['id'], self.best_feature, value))
+            if reason:
+                print('data[%d]的feature[%d]为%s' % (data['id'], self.best_feature, value))
             for tree in self.sub_trees:
                 if tree['value'] == value:
                     return tree['tree'].predict(data)
+            # 当前特征地取值未分配到子树里
+            return self.majority
 
     def get_accuracy(self, test_set):
         """
@@ -208,8 +219,7 @@ class DecisionTree(object):
             self.sub_trees = None
 
     def post_pruning(self, valid_set):
-        if self.is_leaf:
-            print('当前为叶节点，无需剪枝。')
+        if len(valid_set) == 0:
             return
         if self.get_depth() > 2:
             for tree_dict in self.sub_trees:
@@ -217,11 +227,13 @@ class DecisionTree(object):
                 if tree.get_depth() < 2:
                     continue
                 else:
-                    tree.post_pruning(valid_set)
+                    new_valid_set = [x for x in valid_set
+                                     if x['categories_feature'][self.best_feature] == tree_dict['value']]
+                    tree.post_pruning(new_valid_set)
         elif self.get_depth() == 2:
             self.pruning(valid_set)
-            if self.is_leaf:
-                return
+        if self.is_leaf:
+            return
         self.pruning(valid_set)
 
 

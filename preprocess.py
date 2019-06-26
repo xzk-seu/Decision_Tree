@@ -53,4 +53,11 @@ def schema_process():
 
 
 if __name__ == '__main__':
-    data_process()
+    # data_process()
+    out_path = os.path.join(os.getcwd(), 'data', 'adult', 'feature.json')
+    data = json.load(open(out_path, 'r'))
+    i = 0
+    for k, v in data.items():
+        if v['value']:
+            i += 1
+            print(i, k, len(v['value']))
